@@ -2,7 +2,7 @@
 
 ## Context
 
-We're building AdMitra — an AI creative agency agent for Indian small businesses — in a new repo at `/Users/chakra/Documents/Agents/admitra-ai`. It reuses the fashion-shoot-agent's core server infrastructure (Express + WebSocket + Claude Agent SDK streaming + Action Instance Pattern) but replaces all fashion-specific content with ad-creative content. No frontend in the initial build — server + agent only.
+We're building AdMitra — an AI creative agency agent for Indian small businesses — at `/Users/chakra/Documents/Agents/admitra-ai`. The server infrastructure uses Express + WebSocket + Claude Agent SDK streaming + Action Instance Pattern. No frontend in the initial build — server + agent only.
 
 The previous session identified 7 contradictions in the existing ADMITRA_IMPLEMENTATION_PLAN.md and made key architectural decisions (detailed below). This plan resolves all contradictions and provides a clean build order.
 
@@ -69,7 +69,7 @@ admitra-ai/
 **package.json** — trimmed dependencies (no sharp, opencv-js, fluent-ffmpeg, zod, mediabunny, readable-stream, dotenv):
 ```json
 {
-  "name": "admitra-agent",
+  "name": "admitra-ai",
   "version": "1.0.0",
   "type": "module",
   "main": "server/sdk-server.js",
@@ -99,7 +99,7 @@ admitra-ai/
 
 **tsconfig.json** — copy from source as-is (ES2022, ESNext modules, strict)
 
-**.env** — copy actual API keys from fashion-shoot-agent `.env`. Port: 3003 (avoid conflicts).
+**.env** — configure API keys. Port: 3003.
 
 **Then:** `git init && npm install`
 
@@ -107,14 +107,11 @@ admitra-ai/
 
 ## Phase 2: Copy + Refactor Server Core (6 files)
 
-### 2a. `websocket-handler.ts` — COPY AS-IS
-Source: `fashion-shoot-agent/server/lib/websocket-handler.ts` (465 lines). Fully generic.
+### 2a. `websocket-handler.ts` — Generic WS layer (465 lines). Fully generic.
 
-### 2b. `instrumentor.ts` — COPY AS-IS
-Source: `fashion-shoot-agent/server/lib/instrumentor.ts` (394 lines). Fully generic.
+### 2b. `instrumentor.ts` — Event/cost tracking (394 lines). Fully generic.
 
-### 2c. `session-manager.ts` — COPY + SIMPLIFY
-Source: `fashion-shoot-agent/server/lib/session-manager.ts` (629 lines)
+### 2c. `session-manager.ts` — Simplified for AdMitra
 
 Changes:
 1. **PipelineStage**: `'initialized' | 'generating' | 'completed' | 'error'`
@@ -124,8 +121,7 @@ Changes:
 5. **getPipelineStatus**: 4 stages → `initialized:0, generating:50, completed:100, error:-1`
 6. **updatePipelineStage**: update emoji map to match new stages
 
-### 2d. `ai-client.ts` — COPY + ADAPT + SDK UPDATES
-Source: `fashion-shoot-agent/server/lib/ai-client.ts` (408 lines)
+### 2d. `ai-client.ts` — SDK wrapper with hooks (408 lines)
 
 Changes:
 1. **[P0] Add `settingSources: ['project']`** to the `query()` options. Without this, the SDK loads zero filesystem settings — all Skills (ad-creative, action-proposer), CLAUDE.md files, and settings.json are invisible to the agent. The entire skill-based architecture fails silently without this.
@@ -205,13 +201,12 @@ Logic: iterate stream events, handle `content_block_start/delta/stop`, `message_
 
 Use the complete `AssistantMessage` (type `'assistant'`) yielded after each turn as a reconciliation checkpoint rather than relying solely on accumulated deltas.
 
-### 2f. `sdk-server.ts` — COPY + REFACTOR
-Source: `fashion-shoot-agent/server/sdk-server.ts` (989 lines)
+### 2f. `sdk-server.ts` — Express + WebSocket entry point (989 lines)
 
 Changes:
 1. **Import** `handleSDKStreaming` from `./lib/streaming.js`
 2. **Replace** 3 duplicated streaming blocks with calls to `handleSDKStreaming()`
-3. **Health check**: change `agent: 'admitra-agent'`
+3. **Health check**: `agent: 'admitra-ai'`
 4. **execute_action handler**: update `assetTypeMap` to `{ generate_ad: 'ad', generate_video_ad: 'videoAd' }`
 5. **Startup banner**: update to "AdMitra Agent Server"
 6. **Port**: default 3003
@@ -320,7 +315,7 @@ Key methods:
 - **`registerInstance(instance)`** / **`getInstance(id)`** — manage action instances
 - **`executeAction(instanceId, params, context)`** — looks up instance + template, calls `handler(params, context)`, logs to JSONL, returns result
 - **`logExecution(entry)`** — appends one line to `.logs/actions/{date}.jsonl`
-- **`runScript(scriptPath, args, cwd)`** — spawns `npx tsx <script>` as child process, captures stdout/stderr, returns result. (Generic, kept from fashion-shoot-agent.)
+- **`runScript(scriptPath, args, cwd)`** — spawns `npx tsx <script>` as child process, captures stdout/stderr, returns result.
 - **`createActionContext(options)`** — factory for ActionContext
 - **`setPendingContinuation()` / `getPendingContinuation()` / `clearPendingContinuation()`** — manage post-action continuation state
 - **`buildContinuationMessage(continuation)`** — formats action result as message for Claude
@@ -378,17 +373,13 @@ server/actions/
 
 ## Phase 4: Copy Generation Scripts
 
-### 4a. `generate-image.ts` — COPY + remove `import "dotenv/config"`
-Source: `fashion-shoot-agent/agent/.claude/skills/fashion-shoot-pipeline/scripts/generate-image.ts` (278 lines)
-Dest: `admitra-agent/agent/.claude/skills/scripts/generate-image.ts`
+### 4a. `generate-image.ts` — FAL.ai integration (278 lines)
+Location: `agent/.claude/skills/scripts/generate-image.ts`
+No dotenv import needed (tsx --env-file loads env vars, child inherits via process.env).
 
-Only change: remove dotenv import (tsx --env-file loads env vars, child inherits via process.env)
-
-### 4b. `generate-video.ts` — COPY + remove `import "dotenv/config"`
-Source: `fashion-shoot-agent/agent/.claude/skills/fashion-shoot-pipeline/scripts/generate-video.ts` (396 lines)
-Dest: `admitra-agent/agent/.claude/skills/scripts/generate-video.ts`
-
-Same single change.
+### 4b. `generate-video.ts` — Kling AI integration (396 lines)
+Location: `agent/.claude/skills/scripts/generate-video.ts`
+Same approach — no dotenv needed.
 
 ---
 
@@ -412,9 +403,8 @@ AD_PROMPT template with placeholders ({LANGUAGE}, {FESTIVAL}, {BUSINESS_TYPE}, e
 ### 5f. `ad-creative/prompts/video-ad.md` — NEW
 VIDEO_AD_PROMPT template with 4 motion presets (product-focus, festive-energy, text-reveal, slow-pan).
 
-### 5g. `action-proposer/propose-action.ts` — COPY + update VALID_TEMPLATES
-Source: `fashion-shoot-agent/agent/.claude/skills/action-proposer/propose-action.ts` (128 lines)
-Change `VALID_TEMPLATES` from 7 fashion entries to `["generate_ad", "generate_video_ad"]`.
+### 5g. `action-proposer/propose-action.ts` — Action proposal bridge (128 lines)
+`VALID_TEMPLATES`: `["generate_ad", "generate_video_ad"]`.
 
 ### 5h. `action-proposer/SKILL.md` — COPY + REWRITE
 Rewrite to reference 2 AdMitra templates, AdMitra-specific examples, keep critical rules (explain reasoning, never run scripts directly, one action at a time).
@@ -467,7 +457,7 @@ The SDK's `outputFormat` option with JSON Schema can guarantee validated JSON ou
 **Decision: Do not use for action proposals.** Three reasons:
 1. **Incompatible with streaming** — when `outputFormat` is set, `StreamEvent` messages are not emitted. Users would see nothing until Claude finishes, breaking the real-time UX.
 2. **Constrains only the final message** — action proposals happen mid-conversation, not at the end. Structured output forces the terminal response to be JSON.
-3. **The skill-based approach works** — the action-proposer SKILL.md instructs Claude how to format proposals, and the server parses them. This is battle-tested from the fashion-shoot-agent.
+3. **The skill-based approach works** — the action-proposer SKILL.md instructs Claude how to format proposals, and the server parses them.
 
 **Future opportunity:** Structured outputs would work well for a "batch mode" API where a user submits a brief and receives a complete JSON creative package without real-time streaming.
 
@@ -520,20 +510,22 @@ The SDK supports wrapping fal.ai and Kling AI as in-process MCP tools via `creat
 
 ---
 
-## Critical Source Files to Reference
+## Key Project Files
 
-| Source (fashion-shoot-agent/) | Purpose | Action |
-|-------------------------------|---------|--------|
-| `server/sdk-server.ts` (989 lines) | Streaming code to extract | Copy + refactor |
-| `server/lib/ai-client.ts` (408 lines) | SDK wrapper | Copy + adapt + SDK updates (P0/P1) |
-| `server/lib/websocket-handler.ts` (465 lines) | WS layer | Copy as-is |
-| `server/lib/session-manager.ts` (629 lines) | Sessions | Copy + simplify |
-| `server/lib/instrumentor.ts` (394 lines) | Logging | Copy as-is |
-| `server/actions/types.ts` (185 lines) | Type defs | Rewrite (email-agent pattern) |
-| `server/actions/index.ts` (347 lines) | Registry + runScript | Rewrite as ActionsManager |
-| `server/actions/generate-hero.ts` (155 lines) | Executor pattern | Pattern for generate-ad.ts template |
-| `server/actions/generate-video-clip.ts` (177 lines) | Executor pattern | Pattern for generate-video-ad.ts template |
-| `agent/.claude/skills/action-proposer/*` | Proposal bridge | Copy + update templates |
-| `agent/.claude/skills/fashion-shoot-pipeline/scripts/generate-image.ts` | FAL.ai | Copy, remove dotenv |
-| `agent/.claude/skills/fashion-shoot-pipeline/scripts/generate-video.ts` | Kling AI | Copy, remove dotenv |
-| `docs/ADMITRA_IMPLEMENTATION_PLAN.md` | Orchestrator prompt content, skill content | Reference for Phase 5-6 |
+| File | Purpose |
+|------|---------|
+| `server/sdk-server.ts` | Express + WebSocket entry point |
+| `server/lib/ai-client.ts` | SDK wrapper with hooks (P0/P1) |
+| `server/lib/streaming.ts` | Extracted streaming handler |
+| `server/lib/websocket-handler.ts` | Generic WS layer |
+| `server/lib/session-manager.ts` | 4 stages, 2 asset types |
+| `server/lib/instrumentor.ts` | Event/cost tracking |
+| `server/lib/orchestrator-prompt.ts` | Creative director system prompt |
+| `server/actions/types.ts` | Action system types |
+| `server/actions/index.ts` | ActionsManager (auto-discovery, JSONL logging) |
+| `server/actions/templates/generate-ad.ts` | FAL.ai image generation |
+| `server/actions/templates/generate-video-ad.ts` | Kling AI video generation |
+| `agent/.claude/skills/ad-creative/` | Creative direction skill |
+| `agent/.claude/skills/action-proposer/` | Action proposal bridge |
+| `agent/.claude/skills/scripts/generate-image.ts` | FAL.ai script |
+| `agent/.claude/skills/scripts/generate-video.ts` | Kling AI script |

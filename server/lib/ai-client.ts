@@ -198,6 +198,11 @@ export class AIClient {
   private sessionManager: SessionManager;
   private activeGenerations: Map<string, AbortController> = new Map();
   private broadcastFn?: BroadcastFn;
+  // Pending AskUserQuestion resolvers keyed by questionId
+  private pendingQuestions: Map<string, {
+    resolve: (answers: Record<string, string>) => void;
+    reject: (reason: Error) => void;
+  }> = new Map();
 
   constructor(sessionManager?: SessionManager) {
     // Ensure cwd points to agent directory where .claude/ is located
@@ -211,10 +216,7 @@ export class AIClient {
       maxTurns: 100,
       settingSources: ['project'],  // Use project settings only (not user settings)
       permissionMode: 'default',
-      canUseTool: async (_toolName: string, input: Record<string, unknown>) => ({
-        behavior: 'allow' as const,
-        updatedInput: input
-      }),
+      // canUseTool is overridden per-session in queryWithSession
       allowedTools: [
         "Read",
         "Write",
@@ -225,7 +227,8 @@ export class AIClient {
         "Task",
         "Skill",
         "TodoWrite",
-        "WebFetch"
+        "WebFetch",
+        "AskUserQuestion"
       ],
       systemPrompt: ORCHESTRATOR_SYSTEM_PROMPT
     };
@@ -240,6 +243,20 @@ export class AIClient {
    */
   setBroadcast(fn: BroadcastFn): void {
     this.broadcastFn = fn;
+  }
+
+  /**
+   * Resolve a pending AskUserQuestion with user answers
+   * Called from sdk-server.ts when frontend sends question_answer WS message
+   */
+  resolveQuestion(questionId: string, answers: Record<string, string>): boolean {
+    const pending = this.pendingQuestions.get(questionId);
+    if (pending) {
+      pending.resolve(answers);
+      this.pendingQuestions.delete(questionId);
+      return true;
+    }
+    return false;
   }
 
   /**
@@ -310,12 +327,69 @@ export class AIClient {
     // Use custom or default system prompt
     const systemPrompt = metadata?.systemPrompt || this.defaultOptions.systemPrompt;
 
+    // Per-session canUseTool that intercepts AskUserQuestion
+    const canUseTool = async (
+      toolName: string,
+      input: Record<string, unknown>,
+      options: { signal: AbortSignal }
+    ) => {
+      if (toolName === 'AskUserQuestion') {
+        const questions = input.questions as Array<{
+          question: string;
+          header: string;
+          options: Array<{ label: string; description: string }>;
+          multiSelect: boolean;
+        }>;
+
+        const questionId = `q_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
+        console.log(`❓ [AskUserQuestion] Broadcasting ${questions.length} question(s) to frontend (questionId: ${questionId})`);
+
+        // Broadcast questions to frontend via WebSocket
+        if (this.broadcastFn) {
+          this.broadcastFn(session.id, {
+            type: 'ask_user_question',
+            questionId,
+            questions,
+          });
+        }
+
+        // Wait for frontend to respond with answers
+        const answers = await new Promise<Record<string, string>>((resolve, reject) => {
+          this.pendingQuestions.set(questionId, { resolve, reject });
+
+          // Respect AbortSignal to avoid dangling promise
+          const onAbort = () => {
+            this.pendingQuestions.delete(questionId);
+            reject(new Error('Question cancelled'));
+          };
+
+          if (options.signal.aborted) {
+            onAbort();
+            return;
+          }
+          options.signal.addEventListener('abort', onAbort, { once: true });
+        });
+
+        console.log(`✅ [AskUserQuestion] Received answers for questionId: ${questionId}`, answers);
+
+        return {
+          behavior: 'allow' as const,
+          updatedInput: { ...input, answers },
+        };
+      }
+
+      // Default: allow all other tools
+      return { behavior: 'allow' as const, updatedInput: input };
+    };
+
     const queryOptions = {
       ...this.defaultOptions,
       ...resumeOptions,
       systemPrompt,
       includePartialMessages: true,  // Enable real-time token streaming
       abortController,
+      canUseTool,
       hooks: createActionHooks(session.id, this.broadcastFn)
     };
 

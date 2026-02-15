@@ -12,7 +12,7 @@ interface WSClient extends WebSocket {
 
 // Message types from client to server
 export interface WSClientMessage {
-  type: 'subscribe' | 'unsubscribe' | 'chat' | 'continue' | 'cancel' | 'ping' | 'execute_action' | 'continue_action';
+  type: 'subscribe' | 'unsubscribe' | 'chat' | 'continue' | 'cancel' | 'ping' | 'execute_action' | 'continue_action' | 'question_answer';
   sessionId?: string;
   content?: string;
   images?: string[];
@@ -20,6 +20,9 @@ export interface WSClientMessage {
   instanceId?: string;
   params?: Record<string, unknown>;
   originalParams?: Record<string, unknown>;  // Original params from agent for diff tracking
+  // AskUserQuestion fields
+  questionId?: string;
+  answers?: Record<string, string>;
 }
 
 // Message types from server to client
@@ -53,7 +56,8 @@ export interface WSServerMessage {
     | 'action_complete'       // Action completed (success or error)
     | 'awaiting_continuation' // Waiting for user to continue
     | 'tool_complete'          // Tool execution completed (from PostToolUse hook)
-    | 'notification';          // Agent status notification (from Notification hook)
+    | 'notification'           // Agent status notification (from Notification hook)
+    | 'ask_user_question';     // AskUserQuestion from agent (needs frontend answer)
   // Content field for assistant_message
   content?: string;
   costUsd?: number;
@@ -89,6 +93,14 @@ export interface WSServerMessage {
   template?: unknown;  // ActionTemplate for form rendering
   retryAttempt?: number;  // For retry progress messages
   stage?: string;  // For progress messages
+  // AskUserQuestion fields
+  questionId?: string;
+  questions?: Array<{
+    question: string;
+    header: string;
+    options: Array<{ label: string; description: string }>;
+    multiSelect: boolean;
+  }>;
   result?: {
     success: boolean;
     artifact?: string;
@@ -109,6 +121,8 @@ export interface WebSocketEvents {
   // Action-based workflow events
   execute_action: { clientId: string; sessionId: string; instanceId: string; params: Record<string, unknown>; originalParams: Record<string, unknown> };
   continue_action: { clientId: string; sessionId: string; instanceId: string };
+  // AskUserQuestion answer from frontend
+  question_answer: { clientId: string; sessionId: string; questionId: string; answers: Record<string, string> };
 }
 
 /**
@@ -307,6 +321,23 @@ export class WebSocketHandler extends EventEmitter {
           clientId: ws.clientId,
           sessionId: msg.sessionId || ws.sessionId!,
           instanceId: msg.instanceId,
+        });
+        break;
+
+      case 'question_answer':
+        if (!ws.sessionId && !msg.sessionId) {
+          this.sendToClient(ws, { type: 'error', error: 'sessionId required for question_answer' });
+          return;
+        }
+        if (!msg.questionId || !msg.answers) {
+          this.sendToClient(ws, { type: 'error', error: 'questionId and answers required for question_answer' });
+          return;
+        }
+        this.emit('question_answer', {
+          clientId: ws.clientId,
+          sessionId: msg.sessionId || ws.sessionId!,
+          questionId: msg.questionId,
+          answers: msg.answers,
         });
         break;
 

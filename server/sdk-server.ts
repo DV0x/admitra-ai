@@ -332,6 +332,22 @@ wsHandler.on('continue', async ({ clientId, sessionId, content }) => {
 });
 
 /**
+ * Handle WebSocket 'question_answer' event - Forward user answers to pending AskUserQuestion
+ */
+wsHandler.on('question_answer', async ({ clientId, sessionId, questionId, answers }) => {
+  console.log(`❓ [WS] Question answer from ${clientId}: questionId=${questionId}`);
+
+  const resolved = aiClient.resolveQuestion(questionId, answers);
+  if (!resolved) {
+    console.warn(`⚠️ No pending question found for questionId: ${questionId}`);
+    wsHandler.sendToClientById(clientId, {
+      type: 'error',
+      error: `No pending question found for questionId: ${questionId}`,
+    });
+  }
+});
+
+/**
  * Handle WebSocket 'cancel' event - Cancel active generation
  */
 wsHandler.on('cancel', async ({ clientId, sessionId }) => {
@@ -614,6 +630,7 @@ httpServer.listen(PORT, () => {
 ║  { type: 'subscribe', sessionId }              ║
 ║  { type: 'execute_action', instanceId, params }║
 ║  { type: 'continue_action', instanceId }       ║
+║  { type: 'question_answer', questionId, ...}   ║
 ╠════════════════════════════════════════════════╣
 ║  Environment:                                  ║
 ║  - Anthropic API: ${process.env.ANTHROPIC_API_KEY ? '✅ Configured' : '❌ Missing'}           ║
