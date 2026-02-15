@@ -8,7 +8,7 @@
 - Created directory structure: `server/`, `sessions/`, `uploads/`, `.logs/actions/`, `agent/outputs/ads/`
 - Committed: `0040ed4`
 
-### Phase 2: Server Core + SDK Changes (Complete, uncommitted)
+### Phase 2: Server Core + SDK Changes (Complete)
 
 **Copied all files from `/Users/chakra/Documents/Agents/admitra-agent`** into `admitra-ai`:
 
@@ -56,9 +56,7 @@
 
 ---
 
-## What's Next
-
-### Phases 3-6: Already Done!
+### Phases 3-6: Already Done
 
 Everything from the implementation plan's Phases 3-6 was **already built in `admitra-agent`** and has been copied over:
 - Phase 3 (Action System) — `actions/types.ts`, `actions/index.ts`, `actions/templates/`
@@ -66,20 +64,40 @@ Everything from the implementation plan's Phases 3-6 was **already built in `adm
 - Phase 5 (Agent Skills) — `agent/.claude/skills/ad-creative/`, `agent/.claude/skills/action-proposer/`
 - Phase 6 (Orchestrator Prompt) — `server/lib/orchestrator-prompt.ts`
 
-### Phase 7: End-to-End Testing (Next Session)
+---
 
-This is the remaining work:
+## What's Next
 
-1. **Commit Phase 2** — all changes are uncommitted
-2. **Server startup test**: `npm run dev` -> verify health at `http://localhost:3003/health`
-3. **Skills loading test**: Check SDK init message for available slash commands. If Skills don't appear, confirm `settingSources: ['project']` is set and `cwd` points to the agent directory.
-4. **Script test**: Run `generate-image.ts` directly with a test ad prompt to verify FAL.ai integration
-5. **Hook tests**:
-   - `PreToolUse`: Verify it blocks direct `generate-image.ts`/`generate-video.ts` via Bash
-   - `PostToolUse`: Verify `tool_complete` events broadcast to WebSocket
-   - `Notification`: Verify agent status messages forwarded to WebSocket
-6. **Streaming test**: Verify `stream_event` messages include `uuid`, `session_id`, `parent_tool_use_id` metadata
-7. **Full flow WebSocket test**: Connect to `ws://localhost:3003/ws`, send "Create a Diwali sale ad for my jewelry shop in Telugu", verify: streaming -> action proposal -> execute -> artifact -> continue
+All 7 phases are complete. Potential next steps:
+
+1. **Frontend**: Build a web UI with WebSocket client for the chat + ActionCard approval flow
+2. **Video generation**: End-to-end test `generate-video-ad.ts` with Kling AI
+3. **Multi-language flow**: Test sequential ad generation across multiple Indian languages
+4. **Production hardening**: Error recovery, rate limiting, session persistence to disk
+5. **Deployment**: Containerize and deploy (Cloudflare, Railway, etc.)
+
+### Phase 7: End-to-End Testing (Complete)
+
+All tests passed on Feb 15, 2026.
+
+| Test | Result | Details |
+|------|--------|---------|
+| Server startup | ✅ Pass | `npm run dev` → health at `localhost:3003/health`, Anthropic + FAL keys configured |
+| Skills loading | ✅ Pass | SDK init shows 18 tools including `Skill`, `cwd` correctly points to `agent/` |
+| Script test (FAL.ai) | ✅ Pass | `generate-image.ts` produced 6.3MB 2K Hinglish Diwali jewelry ad via `fal-ai/nano-banana-pro` |
+| PreToolUse hook | ✅ Pass | Direct `generate-image.ts` execution blocked; agent redirects to action-proposer |
+| PostToolUse hook | ✅ Pass | `tool_complete` events broadcast to WebSocket with `toolName` field |
+| Streaming metadata | ✅ Pass | `session_id` and `model` present in system init message |
+| Full flow WebSocket | ✅ Pass | 282 messages streamed, cost tracking ($0.12), multi-turn tool use, complete event with `costUsd` |
+
+#### Bugs Fixed During Phase 7
+- **`tool_complete` toolName undefined**: PostToolUse hook was broadcasting `tool:` key instead of `toolName:` — fixed in `ai-client.ts`
+- **`costUsd` missing from complete event**: Cost was nested inside `instrumentation.totalCost_usd` — surfaced as top-level `costUsd` field in `streaming.ts`
+- **`WSServerMessage` type gaps**: Added `tool_complete`, `notification`, and `costUsd` to the type union in `websocket-handler.ts`
+
+#### Commits
+- `6b1aaab` — Fix WebSocket tool_complete toolName, add costUsd to complete event
+- `895972d` — Remove test scripts after Phase 7 validation
 
 ---
 
