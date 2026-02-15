@@ -5,7 +5,10 @@
   "main": "server/sdk-server.js",
   "scripts": {
     "start": "tsx --env-file=.env server/sdk-server.ts",
-    "dev": "tsx watch --env-file=.env server/sdk-server.ts"
+    "dev": "tsx watch --env-file=.env server/sdk-server.ts",
+    "build:frontend": "cd frontend && npm run build",
+    "deploy": "npm run build:frontend && npx wrangler deploy",
+    "deploy:secrets": "echo 'Run each: npx wrangler secret put ANTHROPIC_API_KEY / FAL_KEY / KLING_ACCESS_KEY / KLING_SECRET_KEY'"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.1.73",
@@ -17,11 +20,14 @@
     "ws": "^8.19.0"
   },
   "devDependencies": {
+    "@cloudflare/containers": "^0.1.0",
+    "@cloudflare/workers-types": "^4.20260214.0",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/multer": "^2.0.0",
     "@types/node": "^20.11.0",
     "@types/ws": "^8.18.1",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "wrangler": "^4.65.0"
   }
 }

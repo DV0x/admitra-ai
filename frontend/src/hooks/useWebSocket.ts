@@ -187,7 +187,8 @@ export function useWebSocket() {
     // In development, backend runs on port 3003
     const host = window.location.hostname;
     const port = import.meta.env.DEV ? '3003' : window.location.port;
-    return `${protocol}//${host}:${port}/ws`;
+    const portSuffix = port ? `:${port}` : '';
+    return `${protocol}//${host}${portSuffix}/ws`;
   }, []);
 
   const addMessage = useCallback((message: AddMessageInput): ChatMessage => {

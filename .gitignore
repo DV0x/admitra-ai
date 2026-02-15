@@ -8,3 +8,4 @@ agent/outputs/
 *.log
 .DS_Store
 .history/
+.wrangler/

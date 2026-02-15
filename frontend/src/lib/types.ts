@@ -125,6 +125,7 @@ export interface ThinkingMessage extends BaseMessage {
   content: string;
   blocks?: ContentBlock[];  // Full blocks for expanded view
   isCollapsed?: boolean;
+  isStreaming?: boolean;
 }
 
 export interface ImageMessage extends BaseMessage {

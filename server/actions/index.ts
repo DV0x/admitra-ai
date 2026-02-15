@@ -32,7 +32,9 @@ export class ActionsManager {
 
   constructor() {
     this.templatesDir = path.join(__dirname, 'templates');
-    this.logsDir = path.join(process.cwd(), '.logs', 'actions');
+    this.logsDir = process.env.LOGS_DIR
+      ? path.join(process.env.LOGS_DIR, 'actions')
+      : path.join(process.cwd(), '.logs', 'actions');
     this.ensureLogsDir();
   }
 

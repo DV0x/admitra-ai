@@ -1,0 +1,52 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "admitra-ai",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-01-10",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // ── Static Assets (React Frontend) ──────────────────────────────────────
+  "assets": {
+    "directory": "frontend/dist",
+    "binding": "ASSETS",
+    // SPA mode: serve index.html for all non-file routes
+    "not_found_handling": "single-page-application",
+    // Always run Worker code first (Worker decides what goes to assets vs container)
+    "run_worker_first": true
+  },
+
+  // ── Container Configuration ─────────────────────────────────────────────
+  "containers": [
+    {
+      "class_name": "AdmitraContainer",
+      "image": "./Dockerfile",
+      // 4 GiB RAM, 0.5 vCPU, 8 GB disk
+      // Needed for: Node.js + Express + Claude SDK + tsx + child processes
+      "instance_type": "standard-1",
+      "max_instances": 5
+    }
+  ],
+
+  // ── Durable Object Bindings ─────────────────────────────────────────────
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "ADMITRA_CONTAINER",
+        "class_name": "AdmitraContainer"
+      }
+    ]
+  },
+
+  // ── Migrations (required for Durable Objects with SQLite) ───────────────
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["AdmitraContainer"]
+    }
+  ],
+
+  // ── Non-secret environment variables ────────────────────────────────────
+  "vars": {
+    "NODE_ENV": "production"
+  }
+}

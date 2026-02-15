@@ -7,7 +7,8 @@ interface VoiceInputProps {
 }
 
 // Supported Indian languages for Web Speech API
-const LANGUAGE_CODES: Record<string, string> = {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export const LANGUAGE_CODES: Record<string, string> = {
   'Hindi': 'hi-IN',
   'Telugu': 'te-IN',
   'Tamil': 'ta-IN',
@@ -22,7 +23,7 @@ const LANGUAGE_CODES: Record<string, string> = {
 export function VoiceInput({ onTranscript, disabled = false }: VoiceInputProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [transcript, setTranscript] = useState('');
-  const [selectedLang, setSelectedLang] = useState('hi-IN');
+  const [selectedLang, _setSelectedLang] = useState('hi-IN');
   const recognitionRef = useRef<any>(null);
 
   // Check browser support

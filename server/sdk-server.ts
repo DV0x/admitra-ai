@@ -38,7 +38,7 @@ app.use('/outputs', express.static(path.join(__dirname, '../agent/outputs')));
 app.use('/sessions', express.static(path.join(__dirname, '../sessions')));
 
 // Serve uploaded files
-const uploadsDir = path.join(__dirname, '../uploads');
+const uploadsDir = process.env.UPLOADS_DIR || path.join(__dirname, '../uploads');
 app.use('/uploads', express.static(uploadsDir));
 
 // Configure multer for file uploads
@@ -613,7 +613,7 @@ wsHandler.on('continue_action', async ({ clientId, sessionId, instanceId }) => {
 await initializeActions();
 
 // Start HTTP server (serves both Express and WebSocket)
-httpServer.listen(PORT, () => {
+httpServer.listen(Number(PORT), '0.0.0.0', () => {
   console.log(`
 ╔════════════════════════════════════════════════╗
 ║           AdMitra Agent Server                 ║

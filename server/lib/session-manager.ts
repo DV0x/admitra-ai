@@ -56,7 +56,9 @@ export class SessionManager {
     autoSave?: boolean;
     maxSessionAge?: number;
   } = {}) {
-    this.sessionDirectory = options.sessionDirectory || path.join(process.cwd(), 'sessions');
+    this.sessionDirectory = options.sessionDirectory
+      || process.env.SESSION_DIR
+      || path.join(process.cwd(), 'sessions');
     this.autoSave = options.autoSave ?? true;
     this.maxSessionAge = options.maxSessionAge || this.maxSessionAge;
 
