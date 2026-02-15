@@ -53,4 +53,6 @@ Local SDK reference docs are in `claude_sdk/`. Key files:
 
 ## Subagents
 
-Custom agents live in `.claude/agents/`. The `sdk-architect-analyst` agent is available for SDK documentation analysis and implementation guidance — use it before implementing new SDK features or debugging SDK issues.
+Custom agents live in `.claude/agents/`.
+
+**MANDATORY**: Any task involving the Claude Agent SDK — including implementation, debugging, architecture decisions, troubleshooting, or investigating SDK behavior — **must** be routed through the `sdk-architect-analyst` subagent first. Do not attempt to implement or debug SDK-related functionality without consulting this agent. It reads the local `claude_sdk/` docs and provides verified, documentation-grounded guidance.
