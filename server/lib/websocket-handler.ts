@@ -51,9 +51,12 @@ export interface WSServerMessage {
     | 'action_start'          // Action execution started
     | 'action_progress'       // Action progress update
     | 'action_complete'       // Action completed (success or error)
-    | 'awaiting_continuation'; // Waiting for user to continue
+    | 'awaiting_continuation' // Waiting for user to continue
+    | 'tool_complete'          // Tool execution completed (from PostToolUse hook)
+    | 'notification';          // Agent status notification (from Notification hook)
   // Content field for assistant_message
   content?: string;
+  costUsd?: number;
   sessionId?: string;
   text?: string;
   messageType?: 'thinking' | 'response';

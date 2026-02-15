@@ -146,13 +146,15 @@ export async function handleSDKStreaming(
       wsHandler.broadcastToSession(sessionId, { type: 'system', subtype: (message as any).subtype, data: message });
     } else if (message.type === 'result') {
       // Send completion event (action proposals handled separately via actionEmitter)
+      const report = instrumentor.getCampaignReport();
       wsHandler.broadcastToSession(sessionId, {
         type: 'complete',
         sessionId,
         response: assistantMessages[assistantMessages.length - 1] || '',
+        costUsd: report.totalCost_usd,
         sessionStats: sessionManager.getSessionStats(sessionId),
         pipeline: sessionManager.getPipelineStatus(sessionId),
-        instrumentation: instrumentor.getCampaignReport()
+        instrumentation: report
       });
     }
   }

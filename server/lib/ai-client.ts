@@ -77,7 +77,7 @@ function createActionHooks(sessionId: string, broadcast?: BroadcastFn) {
     if (broadcast) {
       broadcast(sessionId, {
         type: 'tool_complete',
-        tool: postInput.tool_name,
+        toolName: postInput.tool_name,
         result_preview: JSON.stringify(postInput.tool_response).substring(0, 500),
       });
     }
