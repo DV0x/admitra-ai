@@ -7,3 +7,4 @@ agent/outputs/
 .logs/
 *.log
 .DS_Store
+.history/
