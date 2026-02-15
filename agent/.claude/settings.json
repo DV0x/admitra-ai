@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsx .claude/skills/action-proposer/propose-action.ts*)",
+      "Bash(npx tsx .claude/skills/scripts/generate-image.ts*)",
+      "Bash(npx tsx .claude/skills/scripts/generate-video.ts*)",
+      "Bash(mkdir -p outputs/*)",
+      "Bash(ls outputs/*)",
+      "Read(.claude/skills/**)",
+      "Read(outputs/**)",
+      "Read(CLAUDE.md)"
+    ],
+    "deny": []
+  }
+}
