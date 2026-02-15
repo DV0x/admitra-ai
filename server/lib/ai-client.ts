@@ -486,6 +486,7 @@ export class AIClient {
   }
 }
 
-// Export singleton instances
-export const sessionManager = new SessionManager();
+// Single SessionManager instance — imported from session-manager.ts (the sole owner)
+import { sessionManager } from './session-manager.js';
+export { sessionManager };
 export const aiClient = new AIClient(sessionManager);

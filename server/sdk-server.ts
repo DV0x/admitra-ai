@@ -31,8 +31,11 @@ aiClient.setBroadcast((sessionId, message) =>
 app.use(cors());
 app.use(express.json());
 
-// Serve generated assets from agent/outputs
+// Serve generated assets from agent/outputs (legacy/test)
 app.use('/outputs', express.static(path.join(__dirname, '../agent/outputs')));
+
+// Serve session outputs (action-generated assets live here)
+app.use('/sessions', express.static(path.join(__dirname, '../sessions')));
 
 // Serve uploaded files
 const uploadsDir = path.join(__dirname, '../uploads');
@@ -495,6 +498,10 @@ wsHandler.on('execute_action', async ({ clientId, sessionId, instanceId, params,
   console.log(`   Error: ${result.error || '(none)'}`);
   console.log(`   Duration: ${result.duration}ms`);
 
+  // Convert absolute filesystem paths to URL-relative paths for frontend
+  // e.g., /Users/.../sessions/session_xxx/outputs/ads/ad.png → sessions/session_xxx/outputs/ads/ad.png
+  const toUrlPath = (p: string) => path.relative(process.cwd(), p);
+
   if (result.success) {
     wsHandler.broadcastToSession(sessionId, {
       type: 'action_complete',
@@ -502,8 +509,8 @@ wsHandler.on('execute_action', async ({ clientId, sessionId, instanceId, params,
       instanceId,
       result: {
         success: true,
-        artifact: result.artifact,
-        artifacts: result.artifacts,
+        artifact: result.artifact ? toUrlPath(result.artifact) : undefined,
+        artifacts: result.artifacts?.map(toUrlPath),
         message: result.message,
         duration: result.duration,
       },

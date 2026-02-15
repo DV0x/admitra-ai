@@ -93,14 +93,14 @@ export const handler: ActionHandler = async (
 
   const sourceImage = ads[ads.length - 1]; // most recent
 
-  // Ensure output directory exists
-  const adsDir = path.join(context.cwd, 'outputs', 'ads');
+  // Ensure output directory exists (use session output dir, not agent cwd)
+  const adsDir = path.join(context.outputDir, 'ads');
   mkdirSync(adsDir, { recursive: true });
 
-  // Build unique output path: video-ad-{language}-{timestamp}.mp4
+  // Build unique output path (absolute — consistent with ad generation)
   const timestamp = Date.now();
   const outputFilename = `video-ad-${String(language).toLowerCase()}-${timestamp}.mp4`;
-  const outputPath = `outputs/ads/${outputFilename}`;
+  const outputPath = path.join(adsDir, outputFilename);
 
   console.log(`🎬 [VIDEO-AD] Generating video ad:`);
   console.log(`   Source image: ${sourceImage}`);

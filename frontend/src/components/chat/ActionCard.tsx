@@ -184,16 +184,12 @@ export function ActionCard({ message, onExecute, onCancel, isExecuting = false }
 
   // Helper to convert artifact path to URL
   const getArtifactUrl = (path: string) => {
-    // If path starts with outputs/, it's a relative path that needs /outputs/ prefix
-    if (path.startsWith('outputs/')) {
-      return '/' + path;
-    }
     // If path already starts with /, use as-is
     if (path.startsWith('/')) {
       return path;
     }
-    // Otherwise, assume it needs /outputs/ prefix
-    return '/outputs/' + path;
+    // Relative paths like sessions/... or outputs/... just need a / prefix
+    return '/' + path;
   };
 
   // Show result summary if completed

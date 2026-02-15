@@ -510,22 +510,36 @@ The SDK supports wrapping fal.ai and Kling AI as in-process MCP tools via `creat
 
 ---
 
+## Phase 9: Bug Fixes — Path Architecture & Singleton Cleanup (Post-Implementation)
+
+Four root-cause bugs discovered and fixed during E2E testing:
+
+| Bug | Root Cause | Fix | Files |
+|-----|-----------|-----|-------|
+| Video gen "No ad images found" | `createSessionDirectories()` wiped `pipeline.assets` on every chat turn | Guard: `if (!session.pipeline)` | `session-manager.ts` |
+| Action-proposer JSON failures | Shell escaping of Unicode/nested-quote JSON in `--params` CLI arg | Switched to stdin: `echo '{...}' \| npx tsx ...` | `propose-action.ts`, `SKILL.md` |
+| Images not displaying | Templates wrote to `agent/outputs/ads/` instead of session dir; absolute paths sent to frontend | Templates use `context.outputDir`; server converts to URL-relative; added `/sessions` static serving + Vite proxy | `generate-ad.ts`, `generate-video-ad.ts`, `sdk-server.ts`, `vite.config.ts`, `ActionCard.tsx` |
+| Duplicate startup log | Two `SessionManager` instances | Single singleton in `session-manager.ts`; `ai-client.ts` imports it | `session-manager.ts`, `ai-client.ts` |
+
+---
+
 ## Key Project Files
 
 | File | Purpose |
 |------|---------|
-| `server/sdk-server.ts` | Express + WebSocket entry point |
-| `server/lib/ai-client.ts` | SDK wrapper with hooks (P0/P1) |
+| `server/sdk-server.ts` | Express + WebSocket entry point, `/sessions` static serving |
+| `server/lib/ai-client.ts` | SDK wrapper with hooks (imports sessionManager singleton) |
 | `server/lib/streaming.ts` | Extracted streaming handler |
 | `server/lib/websocket-handler.ts` | Generic WS layer |
-| `server/lib/session-manager.ts` | 4 stages, 2 asset types |
+| `server/lib/session-manager.ts` | 4 stages, 2 asset types, single singleton owner |
 | `server/lib/instrumentor.ts` | Event/cost tracking |
 | `server/lib/orchestrator-prompt.ts` | Creative director system prompt |
 | `server/actions/types.ts` | Action system types |
 | `server/actions/index.ts` | ActionsManager (auto-discovery, JSONL logging) |
-| `server/actions/templates/generate-ad.ts` | FAL.ai image generation |
-| `server/actions/templates/generate-video-ad.ts` | Kling AI video generation |
+| `server/actions/templates/generate-ad.ts` | FAL.ai image generation (uses context.outputDir) |
+| `server/actions/templates/generate-video-ad.ts` | Kling AI video generation (uses context.outputDir) |
 | `agent/.claude/skills/ad-creative/` | Creative direction skill |
-| `agent/.claude/skills/action-proposer/` | Action proposal bridge |
+| `agent/.claude/skills/action-proposer/` | Action proposal bridge (stdin JSON) |
 | `agent/.claude/skills/scripts/generate-image.ts` | FAL.ai script |
 | `agent/.claude/skills/scripts/generate-video.ts` | Kling AI script |
+| `frontend/vite.config.ts` | Proxy: /api, /outputs, /uploads, /sessions -> port 3003 |

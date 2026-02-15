@@ -367,16 +367,19 @@ export class SessionManager {
       await fs.mkdir(dir, { recursive: true });
     }
 
-    // Initialize pipeline state
-    session.pipeline = {
-      stage: 'initialized',
-      stageStartedAt: new Date(),
-      assets: {
-        ads: [],
-        videoAds: []
-      },
-      inputImages: []
-    };
+    // Initialize pipeline state only if not already initialized
+    // (preserves assets from prior actions within the same session)
+    if (!session.pipeline) {
+      session.pipeline = {
+        stage: 'initialized',
+        stageStartedAt: new Date(),
+        assets: {
+          ads: [],
+          videoAds: []
+        },
+        inputImages: []
+      };
+    }
 
     console.log(`📁 Created output directories for session: ${sessionId}`);
     console.log(`   ${sessionOutputDir}`);
@@ -545,5 +548,5 @@ export class SessionManager {
   }
 }
 
-// Export singleton instance for convenience
+// Single source of truth — all modules import from here
 export const sessionManager = new SessionManager();

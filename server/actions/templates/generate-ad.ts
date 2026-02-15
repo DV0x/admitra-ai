@@ -107,14 +107,14 @@ export const handler: ActionHandler = async (
     };
   }
 
-  // Ensure output directory exists
-  const adsDir = path.join(context.cwd, 'outputs', 'ads');
+  // Ensure output directory exists (use session output dir, not agent cwd)
+  const adsDir = path.join(context.outputDir, 'ads');
   mkdirSync(adsDir, { recursive: true });
 
-  // Build unique output path: ad-{language}-{timestamp}.png
+  // Build unique output path (absolute — so video gen and asset storage work reliably)
   const timestamp = Date.now();
   const outputFilename = `ad-${String(language).toLowerCase()}-${timestamp}.png`;
-  const outputPath = `outputs/ads/${outputFilename}`;
+  const outputPath = path.join(adsDir, outputFilename);
 
   console.log(`🎨 [AD] Generating ad image:`);
   console.log(`   Language: ${language}`);

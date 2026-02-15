@@ -1,7 +1,7 @@
 # AdMitra Frontend — Complete Implementation Guide
 
 **Date:** 2026-02-15
-**Status:** Implemented (Steps 1-10 complete, Step 11 pending verification)
+**Status:** Implemented and verified (Steps 1-11 complete)
 **Source:** Built in-house for AdMitra
 
 ---
@@ -61,7 +61,7 @@ White-themed "Premium Studio" UI for AdMitra (an Indian small business ad creati
 
 ### Step 1: Scaffold ✅
 - `package.json` — name: "admitra-frontend"
-- `vite.config.ts` — proxy to port 3003
+- `vite.config.ts` — proxy `/api`, `/outputs`, `/uploads`, `/sessions` to port 3003
 - `index.html` — AdMitra title, Instrument Serif + Inter fonts, white theme-color
 - `tsconfig.json`, `tsconfig.app.json`, `tsconfig.node.json`
 - `src/main.tsx`
@@ -108,22 +108,17 @@ White-themed "Premium Studio" UI for AdMitra (an Indian small business ad creati
 - `src/App.tsx` — Wires useWebSocket to ChatView + ChatInput, no presets
 - `src/hooks/useWebSocket.ts` — Main WebSocket hook with P0/P1/P2 adjustments
 
-### Step 11: Verify ⏳
-```bash
-# Terminal 1 — Backend
-cd /Users/chakra/Documents/Agents/admitra-ai && npm run dev
-
-# Terminal 2 — Frontend
-cd /Users/chakra/Documents/Agents/admitra-ai/frontend && npm run dev
-```
-Open http://localhost:5173 and verify:
+### Step 11: Verify ✅
+All verified on Feb 15, 2026:
 1. White theme loads with "AdMitra" branding
 2. WebSocket connects (console: `[WS] Connected`)
 3. Suggestion chips visible in empty state
 4. Type a message → streaming works
 5. Upload an image → upload works
 6. Voice mic button → browser permission prompt
-7. Full flow: "Create a Diwali ad for my jewelry shop in Telugu" → agent → ActionCard → Execute → image
+7. Full flow: upload image → AskUserQuestion → answer → ActionCard → Execute → image displays
+8. Generated images served via `/sessions/{id}/outputs/ads/` route
+9. Action-proposer succeeds on first try (stdin JSON, no shell escaping issues)
 
 ---
 
@@ -140,6 +135,13 @@ These changes align the frontend with server-side SDK changes already in `admitr
 | `costUsd` extraction | `useWebSocket.ts` | Logs session cost in `complete` handler |
 | `costUsd` in types | `types.ts` | Added `costUsd?: number` to GenerateResponse |
 
+## Phase 9 Fixes Applied
+
+| Change | File | Detail |
+|--------|------|--------|
+| `/sessions` proxy | `vite.config.ts` | Added proxy for session output assets to backend port 3003 |
+| Simplified artifact URL | `ActionCard.tsx` | `getArtifactUrl` now just prepends `/` to any relative path (handles `sessions/...` and `outputs/...`) |
+
 ---
 
 ## Complete File Tree
@@ -147,7 +149,7 @@ These changes align the frontend with server-side SDK changes already in `admitr
 ```
 admitra-ai/frontend/
   package.json                              # name: admitra-frontend
-  vite.config.ts                            # proxy to port 3003
+  vite.config.ts                            # proxy /api, /outputs, /uploads, /sessions to port 3003
   tsconfig.json
   tsconfig.app.json
   tsconfig.node.json

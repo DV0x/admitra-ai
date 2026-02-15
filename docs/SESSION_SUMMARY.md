@@ -161,6 +161,35 @@ Built React frontend at `frontend/` — 25 source files total (24 original + 1 n
 
 ---
 
+### Phase 9: Bug Fixes — Path Architecture & Singleton Cleanup (Complete)
+
+Four root-cause bugs discovered during E2E testing on Feb 15, 2026 (session 2).
+
+| Issue | Root Cause | Fix |
+|-------|------------|-----|
+| **Video gen failed** ("No ad images found") | `createSessionDirectories()` unconditionally reset `session.pipeline` (wiping stored ad assets) every time the `chat` handler ran — even for existing sessions | Guard: `if (!session.pipeline)` before initializing |
+| **Action-proposer JSON parsing** (2 wasted agent turns) | Complex JSON with Unicode (Telugu/Hindi), nested quotes, em-dashes broke when passed as `--params` CLI arg due to shell escaping | Switched to stdin: `echo '{...}' \| npx tsx propose-action.ts --templateId ... --label ...` |
+| **Image display broken** in frontend | Templates wrote to `agent/outputs/ads/` (hardcoded) while session system expected `sessions/{id}/outputs/ads/`. Agent also couldn't find generated files. | Templates now use `context.outputDir` (absolute session path). Server converts absolute paths to URL-relative before sending to frontend. |
+| **Duplicate "Session directory ready"** log | Two `SessionManager` instances: one in `session-manager.ts` (orphaned), one in `ai-client.ts` (used) | Single singleton in `session-manager.ts`. `ai-client.ts` imports and re-exports it. |
+
+**Files changed:**
+
+| File | Change |
+|------|--------|
+| `server/lib/session-manager.ts` | Guarded pipeline init in `createSessionDirectories`; kept single singleton |
+| `server/lib/ai-client.ts` | Removed duplicate `new SessionManager()`, imports from `session-manager.ts` |
+| `server/actions/templates/generate-ad.ts` | Uses `context.outputDir` + absolute paths |
+| `server/actions/templates/generate-video-ad.ts` | Uses `context.outputDir` + absolute paths |
+| `server/sdk-server.ts` | Added `/sessions` static serving; converts absolute artifact paths to URL-relative via `path.relative()` |
+| `frontend/vite.config.ts` | Added `/sessions` proxy to backend |
+| `frontend/src/components/chat/ActionCard.tsx` | Simplified `getArtifactUrl` — prepends `/` to any relative path |
+| `agent/.claude/skills/action-proposer/propose-action.ts` | Reads params JSON from stdin instead of `--params` CLI arg |
+| `agent/.claude/skills/action-proposer/SKILL.md` | Updated command format and examples for stdin pattern |
+
+**Type-check:** Both server and frontend pass `npx tsc --noEmit` with 0 errors.
+
+---
+
 ## Manual Testing Results
 
 ### What Works
@@ -171,7 +200,11 @@ Built React frontend at `frontend/` — 25 source files total (24 original + 1 n
 - AskUserQuestion renders QuestionCard with clickable options
 - After answering questions, agent continues and proposes ActionCard
 - ActionCard renders with editable params, "Generate" CTA works
-- FAL.ai image generation produces Telugu clothing shop ad
+- FAL.ai image generation produces ads in session output directory
+- Generated images display correctly in frontend (via `/sessions/` static serving)
+- Action-proposer succeeds on first Bash call (stdin JSON, no shell escaping retries)
+- Server startup shows "Session directory ready" exactly once
+- Pipeline assets preserved across chat turns (video gen can find prior ads)
 
 ### Known Issue: Telugu Text Rendering in Generated Images
 - **Problem:** AI image models (Flux via fal.ai) render Telugu script incorrectly — conjuncts/ligatures don't join properly, characters look visually similar but are typographically broken
@@ -182,25 +215,25 @@ Built React frontend at `frontend/` — 25 source files total (24 original + 1 n
 
 ## What's Next
 
-### Priority 1: Telugu/Indic Text Quality
+### Priority 1: Deployment
+- Containerize (Docker)
+- Deploy to Cloudflare
+- Configure production env vars
+
+### Priority 2: Telugu/Indic Text Quality
 - Implement text overlay post-processing in `generate-image.ts`
 - Generate images with placeholder/no text, overlay real font rendering
 - Test across all 9 supported Indian languages
 
-### Priority 2: Video Generation E2E
+### Priority 3: Video Generation E2E
 - Test `generate-video-ad.ts` with Kling AI end-to-end
 - Verify video appears in frontend VideoMessage component
 
-### Priority 3: Production Hardening
+### Priority 4: Production Hardening
 - Error recovery for failed generations
 - Rate limiting on API calls
 - Session persistence to disk
 - Timeout handling for AskUserQuestion (currently waits indefinitely)
-
-### Priority 4: Deployment
-- Containerize (Docker)
-- Deploy to Cloudflare/Railway
-- Configure production env vars
 
 ---
 
@@ -211,6 +244,9 @@ Built React frontend at `frontend/` — 25 source files total (24 original + 1 n
 - **Process isolation**: Generation scripts run as child processes via `runScript()`
 - **SDK Hooks**: PreToolUse (block scripts), PostToolUse (WS notification + action proposals), Notification (status forwarding)
 - **AskUserQuestion via canUseTool**: Per-session `canUseTool` intercepts the tool, broadcasts questions to frontend via WebSocket, awaits user response, returns `updatedInput` with answers. Respects `AbortSignal` for cancellation.
+- **Session-scoped output paths**: All action outputs write to `sessions/{sessionId}/outputs/ads/` using absolute paths. Server converts to URL-relative paths for frontend. Pipeline assets preserved across chat turns.
+- **Stdin JSON for action-proposer**: Params piped via stdin to avoid shell escaping issues with Unicode/Indic text in CLI arguments.
+- **Single SessionManager singleton**: Owned by `session-manager.ts`, imported by all other modules.
 
 ## File Structure
 
@@ -224,34 +260,38 @@ admitra-ai/
     FRONTEND_IMPLEMENTATION.md
     SESSION_SUMMARY.md              # This file
   server/
-    sdk-server.ts                   # Express + WebSocket + event handlers
+    sdk-server.ts                   # Express + WebSocket + event handlers + /sessions static serving
     lib/
-      ai-client.ts                  # SDK wrapper with hooks + AskUserQuestion
+      ai-client.ts                  # SDK wrapper with hooks + AskUserQuestion (imports sessionManager)
       streaming.ts                  # Extracted streaming handler
       websocket-handler.ts          # Generic WS layer + question types
-      session-manager.ts            # 4 stages, 2 asset types
+      session-manager.ts            # 4 stages, 2 asset types, single singleton owner
       instrumentor.ts               # Event/cost tracking
       orchestrator-prompt.ts        # Creative director system prompt
     actions/
       types.ts                      # Action system types
       index.ts                      # ActionsManager (auto-discovery, JSONL logging)
       templates/
-        generate-ad.ts              # FAL.ai image generation
-        generate-video-ad.ts        # Kling AI video generation
+        generate-ad.ts              # FAL.ai image generation (uses context.outputDir)
+        generate-video-ad.ts        # Kling AI video generation (uses context.outputDir)
   agent/
     CLAUDE.md                       # Agent project instructions
-    outputs/ads/                    # Generated ad images & videos
+    outputs/ads/                    # Legacy test outputs (actions now write to sessions/)
     .claude/
       settings.json                 # Tool permissions
       skills/
         ad-creative/                # Creative direction skill
-        action-proposer/            # Action proposal skill
+        action-proposer/            # Action proposal skill (stdin JSON)
         scripts/
           generate-image.ts         # FAL.ai integration
           generate-video.ts         # Kling AI integration
+  sessions/                         # Session data + action outputs
+    {sessionId}/
+      outputs/ads/                  # Generated ad images & videos
+      {sessionId}.json              # Session metadata
   frontend/
     package.json                    # admitra-frontend
-    vite.config.ts                  # Proxy to port 3003
+    vite.config.ts                  # Proxy: /api, /outputs, /uploads, /sessions -> port 3003
     index.html                      # AdMitra title, fonts
     tsconfig.json / tsconfig.app.json / tsconfig.node.json
     src/
