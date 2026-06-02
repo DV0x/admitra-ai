@@ -1,5 +1,7 @@
 # AdMitra AI
 
+> 🏆 **Built at the Anthropic × Lightspeed hackathon**
+
 AI-powered creative agency that generates hyperlocal, culturally resonant advertising creatives for Indian brands. Built on the Claude Agent SDK with real-time streaming via WebSocket.
 
 ## Architecture
